@@ -11,7 +11,8 @@ class Game:
 
     def __init__(self):
         env.game = self
-        
+
+        # Initialize audio
         pyg.mixer.pre_init(
             config.AUDIO_SAMPLING_RATE, -16, 2, config.AUDIO_BUFFER_SIZE)
         pyg.mixer.init()
@@ -27,23 +28,24 @@ class Game:
         self.screen = pyg.display.set_mode(
             (int(self.SCREEN_SIZE.x), int(self.SCREEN_SIZE.y)))
         pyg.display.set_caption(config.WINDOW_CAPTION)
-        
+
+        # Set the window icon
         if config.WINDOW_ICON_PATH != "":
             pyg.display.set_icon(pyg.image.load(
                 config.WINDOW_ICON_PATH).convert_alpha())
 
-        # TO DO: Don't do this here. Provide API to change background.
+        # TODO: Don't do this here. Provide API to change background.
         # self.background = pyg.image.load("Assets/Sprites/background.png")
         # self.backgroundRect = self.background.get_rect()
 
-        self.entities = pyg.sprite.RenderClear()
-        self.codeObjects = []
+        self.gameObjects = []
         self.sceneLoader = None
 
+    # Main loop
     def MainLoop(self):
         while (True):
 
-            # If there a scene oadload has been requested, load it
+            # If there a scene load has been requested, load it
             if self.sceneLoader is not None:
                 self.__LoadScene__(self.sceneLoader)
 
@@ -58,7 +60,9 @@ class Game:
 
             # Simulate the game logic
             self.Update(dt)
-            self.DoPhysics(dt)
+            self.PhysicsUpdate(dt)
+
+            self.DeleteDeadObjects()
 
             # Render the frame
             self.Render()
@@ -67,72 +71,58 @@ class Game:
             # Wait until the next frame
             self.clock.tick(self.TARGET_FRAMERATE)
 
+    def DeleteDeadObjects(self):
+        for i in range(len(self.gameObjects) - 1, -1, -1):
+            if not self.gameObjects[i].isAlive:
+                self.gameObjects.remove(self.gameObjects[i])
+
     def Update(self, dt):
-        for entity in self.entities:
-            entity.Update(dt)
+        for gameObject in self.gameObjects:
+            if gameObject.isAlive:
+                gameObject.Update(dt)
 
-        for codeObject in self.codeObjects:
-            codeObject.Update(dt)
-
-    def DoPhysics(self, dt):
-        for entity in self.entities:
-            if entity.simulatePhysics:
-                entity.DoPhysics(dt)
+    def PhysicsUpdate(self, dt):
+        for gameObject in self.gameObjects:
+            if gameObject.isAlive:
+                gameObject.PhysicsUpdate(dt)
 
     def Render(self):
-        # TO DO: Uncomment this once the API for the background is there
+        # TODO: Uncomment this once the API for the background is there
         # Draw the background
-        #if self.background not None:
-            #self.screen.blit(self.background, self.backgroundRect)
+        # if self.background not None:
+        #   self.screen.blit(self.background, self.backgroundRect)
 
-        # Transform the sprite
-        for entity in self.entities:
-            entity.rotation = entity.rotation % 360
+        for gameObject in self.gameObjects:
 
-            entity.rect.center = (entity.position.x, entity.position.y)
+            if not gameObject.isAlive:
+                continue
 
-            entity.image = transform.rotate(
-                entity.originalImage, entity.rotation)
+            # Make sure that the rotation is between 0 and 360.
+            # Not sure if pygame needs this, but just in case.
+            # It's good practice anyway.
+            gameObject.rotation = gameObject.rotation % 360
 
-            entity.rect = entity.image.get_rect()
-            entity.rect.center = (entity.position.x, entity.position.y)
+            gameObject.OnRender(self.screen)
 
-        self.entities.draw(self.screen)
+    # GameObject management
+    def NewObject(self, newObject):
+        self.gameObjects.append(newObject)
 
-        for entity in self.entities:
-            entity.OnRender(self.screen)
-
-        for codeObject in self.codeObjects:
-            codeObject.OnRender(self.screen)
-
-    # Entity management
-    def AddEntity(self, newEntity):
-        self.entities.add(newEntity)
-
-    def AddCodeObject(self, newCodeObject):
-        self.codeObjects.append(newCodeObject)
+    def DestroyObject(self, objectToDestroy):
+        objectToDestroy.isAlive = False
+        objectToDestroy.OnDestroy()
 
     # Scene management
     def RequestLoadScene(self, sceneLoader):
         # Queue a scene load
         self.sceneLoader = sceneLoader
 
-    def __LoadScene__(self, sceneLoader):
         # Mark all entities for deletion
-        for entity in self.entities:
-            entity.kill()
+        for gameObject in self.gameObjects:
+            if notgameObject.isPersistent:
+                self.DestroyObject(gameObject)
 
-        for i in range(len(self.codeObjects) - 1, -1, -1):
-            if not self.codeObjects[i].isPersistent:
-                self.codeObjects[i].Destroy()
-
+    def __LoadScene__(self, sceneLoader):
+        self.DeleteDeadObjects()
         sceneLoader()
         self.sceneLoader = None
-
-    # Utilities
-    @staticmethod
-    def LoadAnimation(animationFramePaths):
-        animation = []
-        for path in animationFramePaths:
-            animation.append(pyg.image.load(path).convert_alpha())
-        return animation
