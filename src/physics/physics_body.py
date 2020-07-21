@@ -1,12 +1,12 @@
-import pygame.math as math
+import pygame as pyg
 from ..component import Component
 
 
 class PhysicsBody(Component):
 
     def __init__(self, gameObject):
-        
-        Component.__init__(gameObject)
+
+        Component.__init__(self, gameObject)
 
         # Assign self to the GameObject
         if (gameObject is None):
@@ -17,10 +17,10 @@ class PhysicsBody(Component):
             return
 
         gameObject.physicsBody = self
-        
+
         # State
         self.isEnabled = True
-        self.velocity = math.Vector2(0, 0)
+        self.velocity = pyg.math.Vector2(0, 0)
         self.drag = 0
 
     def PhysicsUpdate(self, dt):

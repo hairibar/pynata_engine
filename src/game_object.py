@@ -1,5 +1,5 @@
 import pygame as pyg
-from . import env
+from .. import env
 
 
 class GameObject:
@@ -21,9 +21,6 @@ class GameObject:
         self.physicsUpdateListeners = []
         self.onRenderListeners = []
 
-        # TODO: How do we access components?
-        self.sprite = None
-        
         self.physicsBody = None
         self.colliders = []
 

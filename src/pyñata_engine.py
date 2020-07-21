@@ -1,8 +1,8 @@
 import pygame as pyg
+from .. import env, config
+from ..import debug_flags as debug
 from pygame import locals
 from pygame import transform
-import src.env as env
-import src.config as config
 
 
 class Game:
@@ -43,9 +43,9 @@ class Game:
 
     # Main loop
     def MainLoop(self):
-        while (True):
+        while True:
 
-            # If there a scene load has been requested, load it
+            # If a scene load has been requested, load it
             if self.sceneLoader is not None:
                 self.__LoadScene__(self.sceneLoader)
 
@@ -72,9 +72,9 @@ class Game:
             self.clock.tick(self.TARGET_FRAMERATE)
 
     def DeleteDeadObjects(self):
-        for i in range(len(self.gameObjects) - 1, -1, -1):
-            if not self.gameObjects[i].isAlive:
-                self.gameObjects.remove(self.gameObjects[i])
+        for gameObject in self.gameObjects[::-1]:
+            if not gameObject.isAlive:
+                self.gameObjects.remove(gameObject)
 
     def Update(self, dt):
         for gameObject in self.gameObjects:
@@ -87,10 +87,6 @@ class Game:
                 gameObject.PhysicsUpdate(dt)
 
     def Render(self):
-        # TODO: Uncomment this once the API for the background is there
-        # Draw the background
-        # if self.background not None:
-        #   self.screen.blit(self.background, self.backgroundRect)
 
         for gameObject in self.gameObjects:
 
@@ -119,7 +115,7 @@ class Game:
 
         # Mark all entities for deletion
         for gameObject in self.gameObjects:
-            if notgameObject.isPersistent:
+            if not gameObject.isPersistent:
                 self.DestroyObject(gameObject)
 
     def __LoadScene__(self, sceneLoader):
