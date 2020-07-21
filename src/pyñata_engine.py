@@ -1,8 +1,11 @@
 import pygame as pyg
+from .camera import Camera
 from .. import env, config
 from ..import debug_flags as debug
 from pygame import locals
-from pygame import transform
+
+
+CLEAR_COLOR = pyg.Color(0, 0, 0)
 
 
 class Game:
@@ -21,6 +24,7 @@ class Game:
         # Clock
         self.clock = pyg.time.Clock()
         self.TARGET_FRAMERATE = config.TARGET_FRAMERATE
+        self.debugTextFont = pyg.font.SysFont("Arial", 18)
 
         # Screen initialization
         self.SCREEN_SIZE = pyg.math.Vector2(
@@ -34,9 +38,9 @@ class Game:
             pyg.display.set_icon(pyg.image.load(
                 config.WINDOW_ICON_PATH).convert_alpha())
 
-        # TODO: Don't do this here. Provide API to change background.
-        # self.background = pyg.image.load("Assets/Sprites/background.png")
-        # self.backgroundRect = self.background.get_rect()
+        # Initialize camera
+        env.camera = Camera()
+        env.camera.position = pyg.math.Vector2(self.SCREEN_SIZE / 2)
 
         self.gameObjects = []
         self.sceneLoader = None
@@ -88,17 +92,41 @@ class Game:
 
     def Render(self):
 
+        self.screen.fill(CLEAR_COLOR)
+
+        # PERF: Maybe not the most optimal solution
+        toRender = []
+
         for gameObject in self.gameObjects:
 
             if not gameObject.isAlive:
                 continue
+
+            toRender.append(gameObject)
+
+        toRender.sort(key=self.__GetDepth__)
+
+        for gameObject in toRender:
 
             # Make sure that the rotation is between 0 and 360.
             # Not sure if pygame needs this, but just in case.
             # It's good practice anyway.
             gameObject.rotation = gameObject.rotation % 360
 
-            gameObject.OnRender(self.screen)
+            gameObject.OnRender(self.screen, env.camera)
+
+        if debug.SHOW_FPS:
+            self.__DrawFramerate__()
+
+    def __GetDepth__(self, gameObject):
+        return gameObject.depth
+
+    def __DrawFramerate__(self):
+        fps = str(int(self.clock.get_fps()))
+        fpsTextSurface = self.debugTextFont.render(fps, False,
+                                                   pyg.Color(255, 255, 255),
+                                                   pyg.Color(0, 0, 0))
+        self.screen.blit(fpsTextSurface, (0, 0))
 
     # GameObject management
     def NewObject(self, newObject):

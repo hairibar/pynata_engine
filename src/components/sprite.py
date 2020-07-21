@@ -1,79 +1,121 @@
 import pygame as pyg
-from . import env
+from ..component import Component
 
 
-# Double inheritance. I know. I'm sorry.
-class Sprite(pyg.sprite.Sprite, Component):
+def LoadImage(path):
+    return pyg.image.load(path).convert_alpha()
 
-    def __init__(self, gameObject):
+
+class Sprite(Component):
+
+    def __init__(self, gameObject, offset=pyg.math.Vector2(0, 0),
+                 inCameraSpace=False):
 
         # Initialize parent classes
-        pyg.sprite.Sprite.__init__(self)
         Component.__init__(self, gameObject)
 
         # Assign self to the GameObject
         if (gameObject is None):
-            print("[ERROR] Can't add a PhysicsBody to a None gameObject.")
-            return
-        elif gameObject.physicsBody is not None:
-            print("[ERROR] " + gameObject.name + " already has a PhysicsBody")
+            print("[ERROR] Can't add a Sprite to a None gameObject.")
             return
 
-        self.gameObject = gameObject
-        gameObject.updateListeners.append(self)
         gameObject.onRenderListeners.append(self)
 
-        # Default values
-        self.frameDuration = 0.16
-        self.animation = None
+        self.originalImage = None
+        self.transformedImage = None
 
-    # Engine messages
-    def Update(self, dt):
-        self.__UpdateAnimation__(dt)
+        self.offset = offset
+        self.flipX = False
+        self.flipY = False
 
-    def OnRender(self, screen):
-        self.rect.center = (
-                    gameObject.position.x, gameObject.position.y) 
-        self.image = transform.rotate(
-            self.originalImage, gameObject.rotation)
+        self.inCameraSpace = inCameraSpace
 
-        self.rect = self.image.get_rect()
-        self.rect.center = (
-            gameObject.position.x, gameObject.position.y)
+        # Values for previous rendered transformation
+        self.previousFlipX = self.flipX
+        self.previousFlipY = self.flipY
+        self.previousScale = self.gameObject.scale
+        self.previousRotation = self.gameObject.rotation
+        self.previousOriginalImage = None
 
-    # Public API
-    @staticmethod
-    def LoadAnimation(animationFramePaths):
-        animation = []
-        for path in animationFramePaths:
-            animation.append(pyg.image.load(path).convert_alpha())
-        return animation
+    def OnRender(self, screen, camera):
+        self.__TransformOriginalImageIfOutdated__()
+        rect = self.__GetScreenSpaceRect__(camera)
 
-    def SetAnimation(self, framePaths):
-        self.animation = LoadAnimation(framePaths)
+        if camera.IsOnScreen(rect):
+            screen.blit(self.transformedImage, rect)
 
-        # Initialize progress
-        self.frameElapsed = 0
-        self.currentFrameIndex = 0
-        self.SetAnimationFrame(0)
+    def SetPreloadedImage(self, image):
+        self.originalImage = image
+        self.transformedImage = image
+        originalRect = self.originalImage.get_rect()
+        self.originalWidth = originalRect.width
+        self.originalHeight = originalRect.height
 
-        self.image = self.originalImage.copy()
+    def SetImageByPath(self, path):
+        image = LoadImage(path)
+        self.SetPreloadedImage(image)
 
-        # Update the rect
-        self.rect = self.image.get_rect()   # lol
-        self.rect.center = (self.position.x, self.position.y)
+    def __TransformOriginalImageIfOutdated__(self):
 
-    def __UpdateAnimation__(self, dt):
-        # Go to the next frame if necessary
-        if self.frameElapsed >= self.frameDuration:
-            self.currentFrameIndex += 1
-            self.frameElapsed = self.frameElapsed % self.frameDuration
-            self.currentFrameIndex = self.currentFrameIndex % len(
-                self.animation)
-            self.SetAnimationFrame(self.currentFrameIndex)
+        image = self.originalImage
 
-        # Increment the counter
-        self.frameElapsed += dt
+        # See what changed
+        originalImageChanged = self.originalImage != self.previousOriginalImage
+        flipChanged = self.flipX != self.previousFlipX or \
+            self.flipY != self.previousFlipY
+        scaleChanged = self.gameObject.scale != self.previousScale
+        rotationChanged = self.gameObject.rotation != self.previousRotation
 
-    def SetAnimationFrame(self, frameIndex):
-        self.originalImage = self.animation[frameIndex]
+        # See what transformations must happen
+        hasNonDefaultFlip = self.flipX or self.flipY
+        hasNonDefaultScale = self.gameObject != 1
+        hasNonDefaultRotation = self.gameObject.rotation != 0
+
+        mustBeFlipped = (
+            originalImageChanged and hasNonDefaultFlip) or flipChanged
+        mustBeScaled = (
+            originalImageChanged and hasNonDefaultScale) or scaleChanged
+        mustBeRotated = (
+            originalImageChanged and hasNonDefaultRotation) or rotationChanged
+
+        mustBeTransformed = originalImageChanged or flipChanged \
+            or scaleChanged or rotationChanged
+
+        if mustBeTransformed:
+            mustBeFlipped = mustBeFlipped or hasNonDefaultFlip
+            mustBeScaled = mustBeScaled or hasNonDefaultScale
+            mustBeRotated = mustBeRotated or hasNonDefaultRotation
+
+        if mustBeFlipped:
+            image = pyg.transform.flip(image, self.flipX,
+                                       self.flipY)
+
+        if mustBeScaled:
+            xSize = int(self.gameObject.scale * self.originalWidth)
+            ySize = int(self.gameObject.scale * self.originalHeight)
+            image = pyg.transform.scale(image, (xSize, ySize))
+
+        if mustBeRotated:
+            image = pyg.transform.rotate(
+                image, self.gameObject.rotation)
+
+        self.previousFlipX = self.flipX
+        self.previousFlipY = self.flipY
+        self.previousScale = self.gameObject.scale
+        self.previousRotation = self.gameObject.rotation
+        self.previousOriginalImage = self.originalImage
+
+        if mustBeTransformed:
+            self.transformedImage = image
+
+    def __GetScreenSpaceRect__(self, camera):
+        rect = self.transformedImage.get_rect()
+        rect.center = (
+            self.gameObject.position.x, self.gameObject.position.y)
+        rect.x += self.offset.x
+        rect.y += self.offset.y
+
+        if not self.inCameraSpace:
+            rect = camera.WorldToScreenSpace(rect)
+
+        return rect

@@ -14,6 +14,7 @@ class GameObject:
         # Transform
         self.position = pyg.math.Vector2(0, 0)
         self.rotation = 0
+        self.scale = 1
 
         # Components
         self.components = []
@@ -23,6 +24,8 @@ class GameObject:
 
         self.physicsBody = None
         self.colliders = []
+
+        self.depth = 1000
 
         env.game.NewObject(self)
 
@@ -52,6 +55,9 @@ class GameObject:
         if self.physicsBody is not None:
             self.physicsBody.PhysicsUpdate(dt)
 
-    def OnRender(self, screen):
+    def OnRender(self, screen, camera):
         for component in self.onRenderListeners:
-            component.OnRender(screen)
+            component.OnRender(screen, camera)
+
+    def OnDestroy(self):
+        pass
